@@ -136,10 +136,10 @@ int main(void)
         exti_line_state = GPIOC_IDR;
         if ((exti_line_state & (1 << 1)) == 0) {
           timer_set_oc_value(TIM4, TIM_OC1, (TIMER_PERIOD/14));
-          timer_set_oc_value(TIM4, TIM_OC4, (TIMER_PERIOD/14));
+          timer_set_oc_value(TIM4, TIM_OC4, (TIMER_PERIOD/10));
         } else {
-          timer_set_oc_value(TIM4, TIM_OC1, (TIMER_PERIOD/8));
-          timer_set_oc_value(TIM4, TIM_OC4, (TIMER_PERIOD/8));
+          timer_set_oc_value(TIM4, TIM_OC1, (TIMER_PERIOD/10));
+          timer_set_oc_value(TIM4, TIM_OC4, (TIMER_PERIOD/14));
         }
     }
     return 0;
