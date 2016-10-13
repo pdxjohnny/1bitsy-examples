@@ -178,6 +178,12 @@ static void forward_step(uint32_t direction)
 
   timer_set_oc_value(FRONT, FRONT_KNEE, SERVO_90);
   sleep(10000000);
+
+  timer_set_oc_value(FRONT, FRONT_HIP, SERVO_180);
+  sleep(10000000);
+
+  timer_set_oc_value(FRONT, FRONT_HIP, SERVO_90);
+  sleep(10000000);
 }
 
 int main(void)
