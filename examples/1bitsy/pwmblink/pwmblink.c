@@ -45,9 +45,9 @@
 #define SERVO_135 ( TIMER_CLOCK /32/(1/0.00175 ))
 #define SERVO_180 ( TIMER_CLOCK /32/(1/0.002   ))
 
-#define FRONT_ROTATE_LEFT SERVO_180
+#define FRONT_ROTATE_LEFT SERVO_135
 #define FRONT_ROTATE_CENTER SERVO_90
-#define FRONT_ROTATE_RIGHT SERVO_0
+#define FRONT_ROTATE_RIGHT SERVO_45
 
 static void clock_setup(void)
 {
@@ -154,8 +154,35 @@ static void button_setup(void)
 	gpio_mode_setup(GPIOC, GPIO_MODE_INPUT, GPIO_PUPD_NONE, GPIO1);
 }
 
+static void sleep(uint32_t time)
+{
+    uint32_t i;
+    for (i = 0; i < time; ++i) {
+        __asm("nop");
+    }
+}
+
+static void forward_step(uint32_t direction)
+{
+  timer_set_oc_value(FRONT, FRONT_HIP, SERVO_180);
+  sleep(10000000);
+
+  timer_set_oc_value(FRONT, FRONT_ROTATE, direction);
+  sleep(10000000);
+
+  timer_set_oc_value(FRONT, FRONT_KNEE, SERVO_45);
+  sleep(10000000);
+
+  timer_set_oc_value(FRONT, FRONT_HIP, SERVO_45);
+  sleep(10000000);
+
+  timer_set_oc_value(FRONT, FRONT_KNEE, SERVO_90);
+  sleep(10000000);
+}
+
 int main(void)
 {
+    uint32_t i;
     uint16_t exti_line_state;
 
     button_boot();
@@ -166,16 +193,23 @@ int main(void)
     tim4_setup();
 
     while (1) {
-        /* Upon button press, change rotation. */
         exti_line_state = GPIOC_IDR;
         if ((exti_line_state & (1 << 1)) == 0) {
-          timer_set_oc_value(FRONT, FRONT_ROTATE, FRONT_ROTATE_RIGHT);
-          timer_set_oc_value(FRONT, FRONT_HIP, SERVO_90);
-          timer_set_oc_value(FRONT, FRONT_KNEE, SERVO_90);
+          // Take a few steps forward on button press
+          sleep(4000000);
+          forward_step(FRONT_ROTATE_CENTER);
+          sleep(4000000);
+          forward_step(FRONT_ROTATE_CENTER);
+          // forward_step(FRONT_ROTATE_LEFT);
+          sleep(4000000);
+          forward_step(FRONT_ROTATE_CENTER);
+          // forward_step(FRONT_ROTATE_RIGHT);
+          sleep(4000000);
+          forward_step(FRONT_ROTATE_CENTER);
         } else {
           timer_set_oc_value(FRONT, FRONT_ROTATE, FRONT_ROTATE_CENTER);
-          timer_set_oc_value(FRONT, FRONT_HIP, SERVO_0);
-          timer_set_oc_value(FRONT, FRONT_KNEE, SERVO_0);
+          timer_set_oc_value(FRONT, FRONT_HIP, SERVO_90);
+          timer_set_oc_value(FRONT, FRONT_KNEE, SERVO_90);
         }
     }
     return 0;

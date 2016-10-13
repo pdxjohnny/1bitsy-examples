@@ -8,3 +8,4 @@ mon swdp_scan
 att 1
 file pwmblink.elf
 load
+r
