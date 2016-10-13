@@ -31,31 +31,54 @@
 #include <libopencm3/stm32/exti.h>
 #include <libopencmsis/core_cm3.h>
 
-#define TIMER_PERIOD 50908
+#define TIMER_CLOCK 81452800
+#define TIMER_PERIOD ( TIMER_CLOCK /32/(1/0.020))
+
+#define FRONT TIM4
+#define FRONT_ROTATE TIM_OC1
+#define FRONT_HIP TIM_OC2
+#define FRONT_KNEE TIM_OC3
+
+#define SERVO_0   ( TIMER_CLOCK /32/(1/0.001   ))
+#define SERVO_45  ( TIMER_CLOCK /32/(1/0.00125 ))
+#define SERVO_90  ( TIMER_CLOCK /32/(1/0.0015  ))
+#define SERVO_135 ( TIMER_CLOCK /32/(1/0.00175 ))
+#define SERVO_180 ( TIMER_CLOCK /32/(1/0.002   ))
+
+#define FRONT_ROTATE_LEFT SERVO_180
+#define FRONT_ROTATE_CENTER SERVO_90
+#define FRONT_ROTATE_RIGHT SERVO_0
 
 static void clock_setup(void)
 {
     rcc_clock_setup_hse_3v3(&rcc_hse_25mhz_3v3[RCC_CLOCK_3V3_168MHZ]);
 }
 
-static void gpiob6_setup(void)
+/*
+ * Front three servos
+ */
+static void gpiob_setup(void)
 {
     // Enable the clock for GPIOB outputs
     rcc_periph_clock_enable(RCC_GPIOB);
+
+    // Rotation
     // Set GPIOB6 to use its alternate function mode with pull-up pull-down
     gpio_mode_setup(GPIOB, GPIO_MODE_AF, GPIO_PUPD_NONE, GPIO6);
     // AF2 for B6 is TIM4_CH1
     gpio_set_af(GPIOB, GPIO_AF2, GPIO6);
-}
 
-static void gpiob1_setup(void)
-{
-    // Enable the clock for GPIOB outputs
-    rcc_periph_clock_enable(RCC_GPIOB);
-    // Set GPIOB9 to use its alternate function mode with pull-up pull-down
-    gpio_mode_setup(GPIOB, GPIO_MODE_AF, GPIO_PUPD_NONE, GPIO9);
-    // AF2 for B9 is TIM4_CH4
-    gpio_set_af(GPIOB, GPIO_AF2, GPIO9);
+    // Hip
+    // Set GPIOB7 to use its alternate function mode with pull-up pull-down
+    gpio_mode_setup(GPIOB, GPIO_MODE_AF, GPIO_PUPD_NONE, GPIO7);
+    // AF2 for B7 is TIM4_CH2
+    gpio_set_af(GPIOB, GPIO_AF2, GPIO7);
+
+    // Knee
+    // Set GPIOB8 to use its alternate function mode with pull-up pull-down
+    gpio_mode_setup(GPIOB, GPIO_MODE_AF, GPIO_PUPD_NONE, GPIO8);
+    // AF2 for B8 is TIM4_CH3
+    gpio_set_af(GPIOB, GPIO_AF2, GPIO8);
 }
 
 static void tim4_setup(void)
@@ -63,51 +86,63 @@ static void tim4_setup(void)
     /* Enable TIM4 clock. */
     rcc_periph_clock_enable(RCC_TIM4);
     /* Reset TIM4 peripheral. */
-    timer_reset(TIM4);
+    timer_reset(FRONT);
     /* Timer global mode:
     * - No divider
     * - Alignment edge
     * - Direction up
     */
-    timer_set_mode(TIM4, TIM_CR1_CKD_CK_INT, TIM_CR1_CMS_EDGE, TIM_CR1_DIR_UP);
-    timer_set_prescaler(TIM4, 32);
+    timer_set_mode(FRONT, TIM_CR1_CKD_CK_INT, TIM_CR1_CMS_EDGE, TIM_CR1_DIR_UP);
+    timer_set_prescaler(FRONT, 32);
     /* Enable preload. */
-    timer_disable_preload(TIM4);
+    timer_disable_preload(FRONT);
     /* Continous mode. */
-    timer_continuous_mode(TIM4);
+    timer_continuous_mode(FRONT);
     /* Period (36kHz). */
-    timer_set_period(TIM4, TIMER_PERIOD);
+    timer_set_period(FRONT, TIMER_PERIOD);
     /* Disable outputs. */
-    timer_disable_oc_output(TIM4, TIM_OC1);
-    timer_disable_oc_output(TIM4, TIM_OC2);
-    timer_disable_oc_output(TIM4, TIM_OC3);
-    timer_disable_oc_output(TIM4, TIM_OC4);
+    timer_disable_oc_output(FRONT, TIM_OC1);
+    timer_disable_oc_output(FRONT, TIM_OC2);
+    timer_disable_oc_output(FRONT, TIM_OC3);
+    timer_disable_oc_output(FRONT, TIM_OC4);
 
-    /* -- OC1 configuration -- */
+    /* -- FRONT_ROTATE configuration -- */
     /* Configure global mode of line 1. */
-    timer_disable_oc_clear(TIM4, TIM_OC1);
-    timer_enable_oc_preload(TIM4, TIM_OC1);
-    timer_set_oc_slow_mode(TIM4, TIM_OC1);
-    timer_set_oc_mode(TIM4, TIM_OC1, TIM_OCM_PWM1);
-    timer_set_oc_polarity_high(TIM4, TIM_OC1);
+    timer_disable_oc_clear(FRONT, FRONT_ROTATE);
+    timer_enable_oc_preload(FRONT, FRONT_ROTATE);
+    timer_set_oc_slow_mode(FRONT, FRONT_ROTATE);
+    timer_set_oc_mode(FRONT, FRONT_ROTATE, TIM_OCM_PWM1);
+    timer_set_oc_polarity_high(FRONT, FRONT_ROTATE);
     /* Set the capture compare value for OC1 to max value -1 for max duty cycle/brightness. */
-    // timer_set_oc_value(TIM4, TIM_OC1, (TIMER_PERIOD/timer_divide));
-    timer_enable_oc_output(TIM4, TIM_OC1);
+    // timer_set_oc_value(FRONT, FRONT_ROTATE, (TIMER_PERIOD/timer_divide));
+    timer_enable_oc_output(FRONT, FRONT_ROTATE);
 
-    /* -- OC4 configuration -- */
+    /* -- FRONT_KNEE configuration -- */
     /* Configure global mode of line 1. */
-    timer_disable_oc_clear(TIM4, TIM_OC4);
-    timer_enable_oc_preload(TIM4, TIM_OC4);
-    timer_set_oc_slow_mode(TIM4, TIM_OC4);
-    timer_set_oc_mode(TIM4, TIM_OC4, TIM_OCM_PWM1);
-    timer_set_oc_polarity_high(TIM4, TIM_OC4);
+    timer_disable_oc_clear(FRONT, FRONT_HIP);
+    timer_enable_oc_preload(FRONT, FRONT_HIP);
+    timer_set_oc_slow_mode(FRONT, FRONT_HIP);
+    timer_set_oc_mode(FRONT, FRONT_HIP, TIM_OCM_PWM1);
+    timer_set_oc_polarity_high(FRONT, FRONT_HIP);
     /* Set the capture compare value for OC1 to max value -1 for max duty cycle/brightness. */
-    // timer_set_oc_value(TIM4, TIM_OC4, (TIMER_PERIOD/timer_divide));
-    timer_enable_oc_output(TIM4, TIM_OC4);
-    timer_enable_preload(TIM4);
+    // timer_set_oc_value(FRONT, FRONT_HIP, (TIMER_PERIOD/timer_divide));
+    timer_enable_oc_output(FRONT, FRONT_HIP);
+    timer_enable_preload(FRONT);
+
+    /* -- FRONT_KNEE configuration -- */
+    /* Configure global mode of line 1. */
+    timer_disable_oc_clear(FRONT, FRONT_KNEE);
+    timer_enable_oc_preload(FRONT, FRONT_KNEE);
+    timer_set_oc_slow_mode(FRONT, FRONT_KNEE);
+    timer_set_oc_mode(FRONT, FRONT_KNEE, TIM_OCM_PWM1);
+    timer_set_oc_polarity_high(FRONT, FRONT_KNEE);
+    /* Set the capture compare value for OC1 to max value -1 for max duty cycle/brightness. */
+    // timer_set_oc_value(FRONT, FRONT_KNEE, (TIMER_PERIOD/timer_divide));
+    timer_enable_oc_output(FRONT, FRONT_KNEE);
+    timer_enable_preload(FRONT);
 
     /* Counter enable. */
-    timer_enable_counter(TIM4);
+    timer_enable_counter(FRONT);
 }
 
 static void button_setup(void)
@@ -127,19 +162,20 @@ int main(void)
 
     clock_setup();
     button_setup();
-    gpiob6_setup();
-    gpiob1_setup();
+    gpiob_setup();
     tim4_setup();
 
     while (1) {
         /* Upon button press, change rotation. */
         exti_line_state = GPIOC_IDR;
         if ((exti_line_state & (1 << 1)) == 0) {
-          timer_set_oc_value(TIM4, TIM_OC1, (TIMER_PERIOD/14));
-          timer_set_oc_value(TIM4, TIM_OC4, (TIMER_PERIOD/10));
+          timer_set_oc_value(FRONT, FRONT_ROTATE, FRONT_ROTATE_RIGHT);
+          timer_set_oc_value(FRONT, FRONT_HIP, SERVO_90);
+          timer_set_oc_value(FRONT, FRONT_KNEE, SERVO_90);
         } else {
-          timer_set_oc_value(TIM4, TIM_OC1, (TIMER_PERIOD/10));
-          timer_set_oc_value(TIM4, TIM_OC4, (TIMER_PERIOD/14));
+          timer_set_oc_value(FRONT, FRONT_ROTATE, FRONT_ROTATE_CENTER);
+          timer_set_oc_value(FRONT, FRONT_HIP, SERVO_0);
+          timer_set_oc_value(FRONT, FRONT_KNEE, SERVO_0);
         }
     }
     return 0;
